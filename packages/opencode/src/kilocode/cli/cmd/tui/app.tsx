@@ -31,7 +31,7 @@ export { KiloClawView } from "@/kilocode/claw/view"
 // ---------------------------------------------------------------------------
 
 /** Default terminal window title. */
-export const APP_TITLE = "Kilo CLI"
+export const APP_TITLE = "Kilo CLI (kojeomstudio)"
 
 /** Public docs URL shown in the command palette. */
 export const DOCS_URL = "https://kilo.ai/docs"
