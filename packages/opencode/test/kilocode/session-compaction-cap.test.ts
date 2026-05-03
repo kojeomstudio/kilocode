@@ -1,4 +1,4 @@
-// Regressions for the MAX_COMPACTION_ATTEMPTS cap in SessionPrompt.runLoop.
+// Regressions for the DEFAULT_MAX_COMPACTION_ATTEMPTS cap in SessionPrompt.runLoop.
 // Ensures the loop cannot spin forever when every compaction round still
 // overflows the model context, and that the exhausted turn surfaces as an
 // error (rather than silently completing).
@@ -235,7 +235,7 @@ describe("session compaction cap", () => {
           // Interleave overflow errors (top-level LLM call) and successful
           // summary texts (compaction.process internal LLM call) so each
           // compaction round completes and the loop re-enters. With
-          // MAX_COMPACTION_ATTEMPTS = 3 we queue 4 errors + 3 texts = 7 calls.
+          // MAX_COMPACTION_ATTEMPTS = 5 we queue 6 errors + 5 texts = 11 calls.
           // The final error triggers guardCompactionAttempt and breaks.
           yield* llm.error(400, overflowBody) // 1 — top-level fails → attempt 1
           yield* llm.text("summary 1") // 2 — compaction summary succeeds
@@ -243,7 +243,11 @@ describe("session compaction cap", () => {
           yield* llm.text("summary 2") // 4
           yield* llm.error(400, overflowBody) // 5 — attempt 3
           yield* llm.text("summary 3") // 6
-          yield* llm.error(400, overflowBody) // 7 — exhausts, breaks
+          yield* llm.error(400, overflowBody) // 7 — attempt 4
+          yield* llm.text("summary 4") // 8
+          yield* llm.error(400, overflowBody) // 9 — attempt 5
+          yield* llm.text("summary 5") // 10
+          yield* llm.error(400, overflowBody) // 11 — exhausts, breaks
 
           const turnClose = yield* Deferred.make<KiloSession.CloseReason>()
           const unsub = yield* bus.subscribeCallback(KiloSession.Event.TurnClose, (evt) => {
@@ -263,7 +267,7 @@ describe("session compaction cap", () => {
 
           // Each compaction round costs 2 LLM calls in this replay-mode path (one
           // top-level overflow + one summary) plus 1 final overflow that trips the cap.
-          expect(yield* llm.calls).toBe(KiloSessionPrompt.MAX_COMPACTION_ATTEMPTS * 2 + 1)
+          expect(yield* llm.calls).toBe(KiloSessionPrompt.DEFAULT_MAX_COMPACTION_ATTEMPTS * 2 + 1)
           expect(reason).toBe("error")
           expect(result.info.role).toBe("assistant")
           if (result.info.role !== "assistant") return
@@ -348,9 +352,10 @@ describe("KiloSessionPrompt.guardCompactionAttempt", () => {
       const msg = makeAssistantStub("ses_under")
       const result = KiloSessionPrompt.guardCompactionAttempt({
         sessionID: "ses_under",
-        attempts: KiloSessionPrompt.MAX_COMPACTION_ATTEMPTS - 1,
+        attempts: KiloSessionPrompt.DEFAULT_MAX_COMPACTION_ATTEMPTS - 1,
         closeReasons,
         message: msg,
+        max: KiloSessionPrompt.DEFAULT_MAX_COMPACTION_ATTEMPTS,
       })
       expect(result.exhausted).toBe(false)
       expect(closeReasons.has("ses_under")).toBe(false)
@@ -365,9 +370,10 @@ describe("KiloSessionPrompt.guardCompactionAttempt", () => {
       const msg = makeAssistantStub("ses_cap")
       const result = KiloSessionPrompt.guardCompactionAttempt({
         sessionID: "ses_cap",
-        attempts: KiloSessionPrompt.MAX_COMPACTION_ATTEMPTS,
+        attempts: KiloSessionPrompt.DEFAULT_MAX_COMPACTION_ATTEMPTS,
         closeReasons,
         message: msg,
+        max: KiloSessionPrompt.DEFAULT_MAX_COMPACTION_ATTEMPTS,
       })
       expect(result.exhausted).toBe(true)
       if (!result.exhausted) return
@@ -385,8 +391,9 @@ describe("KiloSessionPrompt.guardCompactionAttempt", () => {
       const closeReasons = new Map<string, KiloSession.CloseReason>()
       const result = KiloSessionPrompt.guardCompactionAttempt({
         sessionID: "ses_no_msg",
-        attempts: KiloSessionPrompt.MAX_COMPACTION_ATTEMPTS,
+        attempts: KiloSessionPrompt.DEFAULT_MAX_COMPACTION_ATTEMPTS,
         closeReasons,
+        max: KiloSessionPrompt.DEFAULT_MAX_COMPACTION_ATTEMPTS,
       })
       expect(result.exhausted).toBe(true)
       expect(closeReasons.get("ses_no_msg")).toBe("error")

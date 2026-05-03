@@ -63,7 +63,11 @@ export namespace KiloSessionPrompt {
   }) {
     const rules = input.session.permission ?? []
     if (!modes.includes(input.agent.name)) return rules
-    return Permission.merge(rules, input.agent.permission, rules.filter((rule) => rule.action === "deny"))
+    return Permission.merge(
+      rules,
+      input.agent.permission,
+      rules.filter((rule) => rule.action === "deny"),
+    )
   }
 
   export function hardPermissions(input: { agent: { name: string; permission: Permission.Ruleset } }) {
@@ -189,11 +193,15 @@ export namespace KiloSessionPrompt {
    * surface an exhaustion error. Three is enough to cover a normal overflow
    * compaction plus a summary-self-overflow retry without spinning forever.
    */
-  export const MAX_COMPACTION_ATTEMPTS = 3
+  export const DEFAULT_MAX_COMPACTION_ATTEMPTS = 5
+
+  export function maxCompactionAttempts(cfg: { compaction?: { max_attempts?: number } }) {
+    return cfg.compaction?.max_attempts ?? DEFAULT_MAX_COMPACTION_ATTEMPTS
+  }
 
   /**
    * Guards a compaction attempt. When the attempt count has already reached
-   * `MAX_COMPACTION_ATTEMPTS`, marks the close reason as `"error"`, attaches a
+   * the configured maximum, marks the close reason as `"error"`, attaches a
    * `ContextOverflowError` to the assistant message (if provided), and returns
    * `{ exhausted: true }` so callers can break out of the loop. Otherwise
    * returns `{ exhausted: false }`.
@@ -203,14 +211,14 @@ export namespace KiloSessionPrompt {
     attempts: number
     closeReasons: Map<string, KiloSession.CloseReason>
     message?: MessageV2.Assistant
+    max: number
   }) {
-    if (input.attempts < MAX_COMPACTION_ATTEMPTS) return { exhausted: false as const }
+    if (input.attempts < input.max) return { exhausted: false as const }
     const error = new MessageV2.ContextOverflowError({
-      message: `Compaction exhausted: context still exceeds model limits after ${MAX_COMPACTION_ATTEMPTS} attempts`,
+      message: `Compaction exhausted: context still exceeds model limits after ${input.max} attempts`,
     }).toObject()
     input.closeReasons.set(input.sessionID, "error")
     if (input.message) {
-      // Preserve any pre-existing error/finish the caller already set; only fill in blanks.
       input.message.error ??= error
       input.message.finish ??= "error"
     }

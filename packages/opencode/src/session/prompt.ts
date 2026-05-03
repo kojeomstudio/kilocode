@@ -1496,11 +1496,14 @@ NOTE: At any point in time through this workflow you should feel free to ask the
             (yield* compaction.isOverflow({ tokens: lastFinished.tokens, model }))
           ) {
             // kilocode_change start
+            yield* compaction.prune({ sessionID }).pipe(Effect.ignore)
+            if (!(yield* compaction.isOverflow({ tokens: lastFinished.tokens, model }))) continue
             const guard = KiloSessionPrompt.guardCompactionAttempt({
               sessionID,
               attempts: compactionAttempts,
               closeReasons,
               message: lastFinished,
+              max: KiloSessionPrompt.maxCompactionAttempts({}),
             })
             if (guard.exhausted) {
               // lastFinished is a prior turn's assistant — record exhaustion on the
@@ -1611,7 +1614,8 @@ NOTE: At any point in time through this workflow you should feel free to ask the
             const system = [...env, ...(skills ? [skills] : []), ...instructions]
             const format = lastUser.format ?? { type: "text" as const }
             if (format.type === "json_schema") system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT) // kilocode_change
-            const result = yield* handle.process({ // kilocode_change
+            const result = yield* handle.process({
+              // kilocode_change
               // kilocode_change start - keep Ask/Plan tool filtering hardened against session allows
               user: lastUser,
               agent,
@@ -1653,11 +1657,13 @@ NOTE: At any point in time through this workflow you should feel free to ask the
             // kilocode_change end
             if (result === "compact") {
               // kilocode_change start
+              yield* compaction.prune({ sessionID }).pipe(Effect.ignore)
               const guard = KiloSessionPrompt.guardCompactionAttempt({
                 sessionID,
                 attempts: compactionAttempts,
                 closeReasons,
                 message: handle.message,
+                max: KiloSessionPrompt.maxCompactionAttempts({}),
               })
               if (guard.exhausted) {
                 yield* sessions.updateMessage(handle.message)
