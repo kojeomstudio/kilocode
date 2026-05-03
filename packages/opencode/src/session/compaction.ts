@@ -498,6 +498,7 @@ export const layer: Layer.Layer<
               id: PartID.ascending(),
               messageID: replayMsg.id,
               sessionID: input.sessionID,
+              synthetic: true,
             })
           }
         }

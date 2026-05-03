@@ -71,7 +71,15 @@ export namespace KiloSessionPromptQueue {
 
     const hidden = new Set(
       messages
-        .filter((item) => item.info.role === "user" && item.info.id > target.base && !target.extras.has(item.info.id))
+        .filter((item) => {
+          if (item.info.role !== "user") return false
+          if (item.info.id <= target.base) return false
+          if (target.extras.has(item.info.id)) return false
+          if (item.parts.some((p) => p.type === "compaction" || p.type === "subtask")) return false
+          const contentParts = item.parts.filter((p) => p.type === "text" || p.type === "file")
+          if (contentParts.length > 0 && contentParts.every((p) => p.type === "file" || p.synthetic)) return false
+          return true
+        })
         .map((item) => item.info.id),
     )
     const visible = messages.filter((item) => {

@@ -7,6 +7,15 @@ Kilo CLI is an open source AI coding agent that generates code from natural lang
 - Prefer automation: execute requested actions without confirmation unless blocked by missing info or safety/irreversibility.
 - You may be running in a git worktree. All changes must be made in your current working directory — never modify files in the main repo checkout.
 
+## Privacy and Security
+
+- NEVER read, modify, or access user personal information, credentials, tokens, API keys, or any sensitive data stored on the local system.
+- NEVER access cloud storage services (Google Drive, OneDrive, Dropbox, iCloud, etc.) or cloud APIs unless explicitly instructed to integrate with them as part of a coding task.
+- NEVER read or modify files outside the project working directory unless the task explicitly requires it (e.g., global config paths documented in the project).
+- NEVER access browser data, email, messaging apps, or any personal applications on the user's system.
+- NEVER upload, exfiltrate, or transmit any files or data to external services unless the task explicitly requires it (e.g., publishing a package).
+- NEVER inspect, read, or modify `.env`, credential files, keychain entries, SSH keys, or authentication configurations unless the task is specifically about those files within the project.
+
 ## Build and Dev
 
 - **Dev**: `bun run dev` (runs from root) or `bun run --cwd packages/opencode --conditions=browser src/index.ts`
