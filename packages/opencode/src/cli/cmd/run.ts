@@ -575,7 +575,7 @@ export const RunCommand = cmd({
             event.properties.sessionID === sessionID &&
             event.properties.status.type === "idle"
           ) {
-            break
+            return
           }
 
           if (event.type === "permission.asked") {
@@ -693,30 +693,29 @@ export const RunCommand = cmd({
       }
       await share(sdk, sessionID)
 
-      loop().catch((e) => {
-        console.error(e)
-        process.exit(1)
-      })
+      const promptPromise = args.command
+        ? sdk.session.command({
+            sessionID,
+            agent,
+            model: args.model,
+            command: args.command,
+            arguments: message,
+            variant: args.variant,
+          })
+        : sdk.session.prompt({
+            sessionID,
+            agent,
+            model: args.model ? Provider.parseModel(args.model) : undefined,
+            variant: args.variant,
+            parts: [...files, { type: "text", text: message }],
+          })
 
-      if (args.command) {
-        await sdk.session.command({
-          sessionID,
-          agent,
-          model: args.model,
-          command: args.command,
-          arguments: message,
-          variant: args.variant,
-        })
-      } else {
-        const model = args.model ? Provider.parseModel(args.model) : undefined
-        await sdk.session.prompt({
-          sessionID,
-          agent,
-          model,
-          variant: args.variant,
-          parts: [...files, { type: "text", text: message }],
-        })
-      }
+      await Promise.race([
+        promptPromise,
+        (async () => {
+          await loop()
+        })(),
+      ])
     }
 
     if (args.attach) {
